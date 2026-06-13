@@ -27,50 +27,9 @@ df_encuesta = df_encuesta[df_encuesta['E_CUEST'].str.contains('13 a 17', na=Fals
 
 #%%
 # Filtrar columnas por texto
-df_encuesta = df_encuesta.filter(regex=r'^(C_3_HAC|HAC_|T_C3_FCA|FCA_|C3_EE|T_C3_EE|C3_AAPC|F_|id|region|Edadd|antropo_sex)')
+df_encuesta = df_encuesta.filter(regex=r'^(C_3_HAC|HAC_5_10|HAC_5_12|HAC_5_13|T_C3_FCA|FCA_|C3_EE|T_C3_EE|F_|id|region|Edadd|antropo_sex)')
 
-# Borrar columnas vacías con pasos simples
-#df_encuesta = df_encuesta.replace(r'^\s*$', np.nan, regex=True)
-#conteo_respuestas = df_encuesta.count()
-#columnas_a_borrar = conteo_respuestas[conteo_respuestas < 24].index
-
-#df_encuesta = df_encuesta.drop(columns=columnas_a_borrar)
 #%%
-columnas_a_borrar = ['T_C3_EE_7_2_2', 'T_C3_EE_7_2_3', 'T_C3_EE_7_2_7' ,'T_C3_EE_7_2_8' , 'T_C3_EE_7_2_9' ]
+#AHORA SACO DE LAS COLUMNA DE F QUE INDICAN GRUPOS DE ALIMENTOS LAS QUE NO ME INTERESAN
+columnas_a_borrar = ['T_C3_EE_7_2_2', 'T_C3_EE_7_2_3', 'T_C3_EE_7_2_7' ,'T_C3_EE_7_2_8' , 'T_C3_EE_7_2_9', 'F_FF', 'F_V', 'F_LYQ', 'F_CR', 'F_PESC']
 df_encuesta = df_encuesta.drop(columns=columnas_a_borrar)
-#%%
-# ==========================================
-# 3. FUNCIÓN DE LIMPIEZA BÁSICA Y REUTILIZABLE
-# ==========================================
-
-def limpiar_y_promediar_base(df, nombre_base):
-    # 1. Filtrar para quedarnos solo con los adolescentes de la encuesta
-    df_filtrado = df[df['clave'].isin(claves_adolescentes)].copy()
-    
-    # 2. Mostrar estadísticas básicas en la terminal
-    filas_totales = len(df_filtrado)
-    claves_unicas = df_filtrado['clave'].nunique()
-    print(f"\n--- Reporte de {nombre_base} ---")
-    print(f"Filas iniciales: {filas_totales}")
-    print(f"Claves únicas: {claves_unicas}")
-    print(f"Adolescentes con 2 recordatorios: {filas_totales - claves_unicas}")
-    
-    # 3. Separar las columnas de identificación del resto de los datos numéricos
-    # Dejamos 'clave' afuera para usarla en el groupby
-    columnas_id = ['informe_id', 'miembro_id'] 
-    
-    # Conseguir los primeros registros de los IDs (para no perderlos)
-    df_ids = df_filtrado.groupby('clave')[columnas_id].first().reset_index()
-    
-    # Conseguir el promedio de todas las columnas numéricas de la base
-    df_promedios = df_filtrado.groupby('clave').mean(numeric_only=True).reset_index()
-    
-    # 4. Juntar los IDs y los Promedios en una sola tabla limpia usando 'clave'
-    df_final = pd.merge(df_ids, df_promedios, on='clave')
-    
-    # 5. Calcular cuántos adolescentes faltan en esta base comparado con la encuesta
-    faltantes = len(claves_adolescentes - set(df_final['clave']))
-    print(f"Faltantes en esta base: {faltantes}")
-    
-    return df_final
-
