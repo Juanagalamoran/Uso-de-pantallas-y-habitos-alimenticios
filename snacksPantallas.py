@@ -14,9 +14,8 @@ ruta = 'C:/Users/cuina/OneDrive/Escritorio/proyectoSole/'
 # 1. CARGA DE DATOS
 df_variables = pd.read_csv(ruta + 'ennys2_variables.csv', encoding='latin1', sep=';')
 df_encuesta = pd.read_csv(ruta + 'ENNyS2_encuesta.csv', encoding='latin1', sep=',')
-df_nutrientes = pd.read_csv(ruta + 'Base_Nutrientes.csv', encoding='latin1', sep=',')
-df_alimentos = pd.read_csv(ruta + 'Base_Alimentos_Bebidas_Suplementos.csv', encoding='latin1', sep=',')
 
+#%%
 # ==========================================
 # 2. LIMPIEZA DE BASE ENCUESTA
 # ==========================================
@@ -26,21 +25,20 @@ patron_variables = r'^(?:C3_HAC_5_1|C3_HAC_5_12|T_C3_FCA_6_1_1|C3_EE_7_|T_C3_EE_
 df_variables = df_variables[df_variables['id'].str.contains(patron_variables, na=False, regex=True)]
 df_encuesta = df_encuesta[df_encuesta['E_CUEST'].str.contains('13 a 17', na=False)]
 
+#%%
 # Filtrar columnas por texto
-df_encuesta = df_encuesta.filter(regex=r'^(C_3_HAC|HAC_|T_C3_FCA|FCA_|C3_EE|T_C3_EE|C3_AAPC|F_|id|MHDR_KEY)')
+df_encuesta = df_encuesta.filter(regex=r'^(C_3_HAC|HAC_|T_C3_FCA|FCA_|C3_EE|T_C3_EE|C3_AAPC|F_|id|region|Edadd|antropo_sex)')
 
 # Borrar columnas vacías con pasos simples
-df_encuesta = df_encuesta.replace(r'^\s*$', np.nan, regex=True)
-conteo_respuestas = df_encuesta.count()
-columnas_a_borrar = conteo_respuestas[conteo_respuestas < 24].index
+#df_encuesta = df_encuesta.replace(r'^\s*$', np.nan, regex=True)
+#conteo_respuestas = df_encuesta.count()
+#columnas_a_borrar = conteo_respuestas[conteo_respuestas < 24].index
+
+#df_encuesta = df_encuesta.drop(columns=columnas_a_borrar)
+#%%
+columnas_a_borrar = ['T_C3_EE_7_2_2', 'T_C3_EE_7_2_3', 'T_C3_EE_7_2_7' ,'T_C3_EE_7_2_8' , 'T_C3_EE_7_2_9' ]
 df_encuesta = df_encuesta.drop(columns=columnas_a_borrar)
-
-print(f"Se eliminaron {len(columnas_a_borrar)} columnas por pocas respuestas.")
-
-# Guardamos las claves de los adolescentes
-claves_adolescentes = set(df_encuesta['MHDR_KEY'])
-
-
+#%%
 # ==========================================
 # 3. FUNCIÓN DE LIMPIEZA BÁSICA Y REUTILIZABLE
 # ==========================================
@@ -76,17 +74,3 @@ def limpiar_y_promediar_base(df, nombre_base):
     
     return df_final
 
-
-# ==========================================
-# 4. PROCESAR NUTRIENTES Y ALIMENTOS
-# ==========================================
-
-# Primero recortamos los nutrientes a las columnas que te interesan antes de mandarlo a la función
-columnas_nutr_interes = ['informe_id','miembro_id','clave','nro_R24H','tot_energia_kcal','tot_proteinas',
-                         'tot_lipidos','tot_CHO_totales','tot_azucar_total','tot_azucar_agregado','tot_fibra_total','tot_sodio']
-df_nutrientes = df_nutrientes[columnas_nutr_interes]
-df_nutrientes = limpiar_y_promediar_base(df_nutrientes, "Nutrientes")
-
-# Para alimentos, filtramos por columnas primero usando tu regex, y luego lo mandamos a la función
-df_alimentos = df_alimentos.filter(regex=r'^(D|O|B|R|informe_id|miembro_id|clave|nro_R24H)')
-df_alimentos = limpiar_y_promediar_base(df_alimentos, "Alimentos")
