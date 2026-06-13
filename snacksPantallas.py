@@ -8,12 +8,12 @@ Created on Thu May 28 13:56:25 2026
 import pandas as pd
 import numpy as np
 
-#ruta = 'C:/Users/Juani/OneDrive/Escritorio/proyectoSole/Uso-de-pantallas-y-habitos-alimenticios/' 
-ruta = 'C:/Users/cuina/OneDrive/Escritorio/proyectoSole/'
+ruta = 'C:/Users/Juani/OneDrive/Escritorio/proyectoSole/Uso-de-pantallas-y-habitos-alimenticios/' 
+#ruta = 'C:/Users/cuina/OneDrive/Escritorio/proyectoSole/'
 
 # 1. CARGA DE DATOS
 df_variables = pd.read_csv(ruta + 'ennys2_variables.csv', encoding='latin1', sep=';')
-df_encuesta = pd.read_csv(ruta + 'ENNyS2_encuesta.csv', encoding='latin1', sep=',')
+df_encuesta = pd.read_csv(ruta + 'ENNyS2_encuesta.csv', encoding='latin1', sep=';')
 
 #%%
 # ==========================================
@@ -38,39 +38,91 @@ df_encuesta = df_encuesta.filter(regex=r'^(C_3_HAC|HAC_|T_C3_FCA|FCA_|C3_EE|T_C3
 #%%
 columnas_a_borrar = ['T_C3_EE_7_2_2', 'T_C3_EE_7_2_3', 'T_C3_EE_7_2_7' ,'T_C3_EE_7_2_8' , 'T_C3_EE_7_2_9' ]
 df_encuesta = df_encuesta.drop(columns=columnas_a_borrar)
+
+df_encuesta.to_csv(
+    r"C:\Users\juani\OneDrive\Escritorio\encuesta_filtrada.csv",
+    index=False,
+    encoding="utf-8"
+)
 #%%
-# ==========================================
-# 3. FUNCIÓN DE LIMPIEZA BÁSICA Y REUTILIZABLE
-# ==========================================
+#Oferta alimentaria en la escuela
 
-def limpiar_y_promediar_base(df, nombre_base):
-    # 1. Filtrar para quedarnos solo con los adolescentes de la encuesta
-    df_filtrado = df[df['clave'].isin(claves_adolescentes)].copy()
-    
-    # 2. Mostrar estadísticas básicas en la terminal
-    filas_totales = len(df_filtrado)
-    claves_unicas = df_filtrado['clave'].nunique()
-    print(f"\n--- Reporte de {nombre_base} ---")
-    print(f"Filas iniciales: {filas_totales}")
-    print(f"Claves únicas: {claves_unicas}")
-    print(f"Adolescentes con 2 recordatorios: {filas_totales - claves_unicas}")
-    
-    # 3. Separar las columnas de identificación del resto de los datos numéricos
-    # Dejamos 'clave' afuera para usarla en el groupby
-    columnas_id = ['informe_id', 'miembro_id'] 
-    
-    # Conseguir los primeros registros de los IDs (para no perderlos)
-    df_ids = df_filtrado.groupby('clave')[columnas_id].first().reset_index()
-    
-    # Conseguir el promedio de todas las columnas numéricas de la base
-    df_promedios = df_filtrado.groupby('clave').mean(numeric_only=True).reset_index()
-    
-    # 4. Juntar los IDs y los Promedios en una sola tabla limpia usando 'clave'
-    df_final = pd.merge(df_ids, df_promedios, on='clave')
-    
-    # 5. Calcular cuántos adolescentes faltan en esta base comparado con la encuesta
-    faltantes = len(claves_adolescentes - set(df_final['clave']))
-    print(f"Faltantes en esta base: {faltantes}")
-    
-    return df_final
+columnas_kiosco = [
+    'C3_EE_7_5_O1','C3_EE_7_5_O2','C3_EE_7_5_O3',
+    'C3_EE_7_5_O4','C3_EE_7_5_O5','C3_EE_7_5_O6',
+    'C3_EE_7_5_O9','C3_EE_7_5_O10',
+    'C3_EE_7_5_O11','C3_EE_7_5_O12'
+]
 
+def cantidad_no_recomendados(fila):
+
+    contador = 0
+
+    for col in columnas_kiosco:
+
+        valor = str(fila[col])
+
+        if ('Bebidas con az' in valor or
+            'Productos de copet' in valor or
+            'Golosinas' in valor or
+            'Facturas' in valor):
+
+            contador += 1
+
+    return contador
+
+
+df_encuesta['cant_E_NR'] = df_encuesta.apply(
+    cantidad_no_recomendados,
+    axis=1
+)
+
+
+columnas_oferta = [
+    'T_C3_EE_7_2_1',
+    'T_C3_EE_7_2_4',
+    'T_C3_EE_7_2_5',
+    'T_C3_EE_7_2_6',
+    'T_C3_EE_7_2_10'
+]
+
+mapeo = {
+    'Nunca': 0,
+    'A veces': 1,
+    'Siempre': 2
+}
+
+df_encuesta[columnas_oferta] = (
+    df_encuesta[columnas_oferta]
+    .replace(mapeo)
+)
+
+
+consumo_escolar = df_encuesta[
+    [
+        'id',
+        'cant_E_NR',
+        'C3_EE_7_1',
+          'T_C3_EE_7_2_1',
+          'T_C3_EE_7_2_4',
+          'T_C3_EE_7_2_5',
+          'T_C3_EE_7_2_6',
+          'T_C3_EE_7_2_10'
+    ]
+].copy()
+
+consumo_escolar = consumo_escolar.rename(columns={
+    'C3_EE_7_1' : 'Come en la escuela',
+    'T_C3_EE_7_2_1': 'OE_bebidas_azucaradas',
+  
+  
+    'T_C3_EE_7_2_4': 'OE_copetin',
+    'T_C3_EE_7_2_5': 'OE_golosinas',
+    'T_C3_EE_7_2_6': 'OE_facturas',
+   
+  
+    'T_C3_EE_7_2_10': 'OE_sandwich'
+})
+
+print(consumo_escolar.head())
+    
