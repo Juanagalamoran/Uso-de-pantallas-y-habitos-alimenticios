@@ -30,6 +30,14 @@ df_encuesta = df_encuesta.filter(
 columnas_a_borrar = ['T_C3_EE_7_2_2', 'T_C3_EE_7_2_3', 'T_C3_EE_7_2_7' ,'T_C3_EE_7_2_8' , 'T_C3_EE_7_2_9', 'F_FF', 'F_V', 'F_LYQ', 'F_CR', 'F_PESC']
 df_encuesta = df_encuesta.drop(columns=columnas_a_borrar)
 
+#%%corregimos la edad
+df_encuesta["Edadd"] = pd.to_numeric(
+    df_encuesta["Edadd"],
+    errors="coerce"
+)
+
+df_encuesta["Edadd"] = np.floor(df_encuesta["Edadd"] / 365).astype("Int64")
+
 #df_encuesta.to_csv(
 #    r"C:\Users\juani\OneDrive\Escritorio\encuesta_filtrada.csv",
 #    index=False,
@@ -126,7 +134,7 @@ habitos_alimentarios = pd.DataFrame({
 })
 #%% frecuencia de alimentos
 mapeo_frecuencia = {'Nunca o menos de 1 vez al mes': 0,'Entre 1 y 3 veces al mes': 1,'1 vez por semana': 2,
-'2 a 4 veces por semana': 3,'5 a 6 veces por semana': 4,'1 vez al d?¡a': 5,'Entre 2 y 3 veces al d?¡a': 6,'Entre 4 y 5 veces al d?¡a':7,'6 veces o m?¡s por d?¡a':8}
+'2 a 4 veces por semana': 3,'5 a 6 veces por semana': 4,'1 vez al d?¡a': 5,'Entre 2 y 3 veces al d?¡a': 6,'Entre 4 y 5 veces al d?¡a':7,'6 veces o m?ís por d?¡a':8}
 
 columnas_frecuencia = ['T_C3_FCA_6_1_11','T_C3_FCA_6_1_12','T_C3_FCA_6_1_13','T_C3_FCA_6_1_14','T_C3_FCA_6_1_16']
 
@@ -141,8 +149,91 @@ frecuencia_consumo = frecuencia_consumo.rename(columns={
     'T_C3_FCA_6_1_14': 'preelaborados',
     'T_C3_FCA_6_1_16': 'FC_bebidas_con_azucar'
 })
-#%% Ahora eliminamos la columnas que usamos para consumo_escolar y las eliminamos de df_encuesta
+
+for col in [
+    "copetin",
+    "golosinas",
+    "facturas",
+    "preelaborados",
+    "FC_bebidas_con_azucar"
+]:
+    frecuencia_consumo[col + "_semanalmente"] = (
+        frecuencia_consumo[col] >= 2
+    ).astype(int)
+
+frecuencia_consumo["consume_NR"] = (
+    frecuencia_consumo[
+        [
+            "copetin_semanalmente",
+            "golosinas_semanalmente",
+            "facturas_semanalmente",
+            "preelaborados_semanalmente",
+            "FC_bebidas_con_azucar_semanalmente"
+        ]
+    ].max(axis=1)
+)
+#%%Pantallas
+pantallas = df_encuesta[['id','Edadd', 'C3_AF_4_2', 'C3_AF_4_3']].copy()
+
+pantallas = pantallas.rename(columns={
+    'Edadd' : 'edad',
+    'C3_AF_4_2': 'tiempo_pantallas',
+    'C3_AF_4_3': 'tiempo_videojuegos'
+})
+
+pantallas["tiempo_pantallas"] = pd.to_numeric(
+    pantallas["tiempo_pantallas"],
+    errors="coerce"
+)
+
+pantallas["tiempo_videojuegos"] = pd.to_numeric(
+    pantallas["tiempo_videojuegos"],
+    errors="coerce"
+)
+
+pantallas.loc[pantallas["tiempo_pantallas"] == 999, "tiempo_pantallas"] = np.nan
+pantallas.loc[pantallas["tiempo_videojuegos"] == 999, "tiempo_videojuegos"] = np.nan
+
+pantallas["horas_pantalla_dia"] = (
+    pantallas["tiempo_pantallas"] / 60 / 7
+)
+
+pantallas["horas_videojuegos_dia"] = (
+    pantallas["tiempo_videojuegos"] / 60 / 7
+)
+
+
+pantallas['horas_totales_pantalla_dia'] = (
+    pantallas['horas_pantalla_dia'] +
+    pantallas['horas_videojuegos_dia']
+)
+#%%guardamos los csv
+consumo_escolar.to_csv(
+    ruta + "consumo_escolar.csv",
+    index=False,
+    encoding="utf-8"
+)
+
+habitos_alimentarios.to_csv(
+    ruta + "habitos_alimentarios.csv",
+    index=False,
+    encoding="utf-8"
+)
+
+frecuencia_consumo.to_csv(
+    ruta + "frecuencia_consumo.csv",
+    index=False,
+    encoding="utf-8"
+)
+
+pantallas.to_csv(
+    ruta + "pantallas.csv",
+    index=False,
+    encoding="utf-8"
+)
+
 #%% Por ultimo, eliminamos las columnas que ya usamos
+""""
 columnas_a_eliminar = ['C3_EE_7_1','C3_EE_7_5_O1','C3_EE_7_5_O2','C3_EE_7_5_O3','C3_EE_7_5_O4','C3_EE_7_5_O5',
 'C3_EE_7_5_O6','C3_EE_7_5_O9','C3_EE_7_5_O10','C3_EE_7_5_O11','C3_EE_7_5_O12','T_C3_EE_7_2_1','T_C3_EE_7_2_4',
 'T_C3_EE_7_2_5','T_C3_EE_7_2_6','T_C3_EE_7_2_10']
@@ -158,6 +249,6 @@ columnas_a_eliminar = ['T_C3_FCA_6_1_1','T_C3_FCA_6_1_2','T_C3_FCA_6_1_3','T_C3_
                        ,'T_C3_FCA_6_1_9','T_C3_FCA_6_1_10','T_C3_FCA_6_1_11','T_C3_FCA_6_1_12','T_C3_FCA_6_1_13','T_C3_FCA_6_1_14','T_C3_FCA_6_1_16','T_C3_FCA_6_1_17']
 df_encuesta = df_encuesta.drop(columns=columnas_a_eliminar)
 
-
+"""
 
 
