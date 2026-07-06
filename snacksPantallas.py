@@ -195,18 +195,24 @@ pantallas.loc[pantallas["tiempo_pantallas"] == 999, "tiempo_pantallas"] = np.nan
 pantallas.loc[pantallas["tiempo_videojuegos"] == 999, "tiempo_videojuegos"] = np.nan
 
 pantallas["horas_pantalla_dia"] = (
-    pantallas["tiempo_pantallas"] / 60 / 7
-)
+    pantallas["tiempo_pantallas"] / 60 / 7).round(2)
 
 pantallas["horas_videojuegos_dia"] = (
-    pantallas["tiempo_videojuegos"] / 60 / 7
-)
+    pantallas["tiempo_videojuegos"] / 60 / 7).round(2)
 
 
 pantallas['horas_totales_pantalla_dia'] = (
     pantallas['horas_pantalla_dia'] +
     pantallas['horas_videojuegos_dia']
 )
+
+#%%
+import matplotlib.pyplot as plt
+
+plt.hist(pantallas["horas_totales_pantalla_dia"], bins=30)
+plt.xlabel("Horas por día")
+plt.ylabel("Frecuencia")
+plt.show()
 #%%guardamos los csv
 consumo_escolar.to_csv(
     ruta + "consumo_escolar.csv",
