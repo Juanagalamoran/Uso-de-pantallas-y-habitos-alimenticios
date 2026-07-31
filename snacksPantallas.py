@@ -177,28 +177,28 @@ pantallas = df_encuesta[['id','Edadd', 'C3_AF_4_2', 'C3_AF_4_3']].copy()
 
 pantallas = pantallas.rename(columns={
     'Edadd' : 'edad',
-    'C3_AF_4_2': 'tiempo_pantallas',
-    'C3_AF_4_3': 'tiempo_videojuegos'
+    'C3_AF_4_2': 'minutos_pantallas',
+    'C3_AF_4_3': 'minutos_videojuegos'
 })
 
-pantallas["tiempo_pantallas"] = pd.to_numeric(
-    pantallas["tiempo_pantallas"],
+pantallas["minutos_pantallas"] = pd.to_numeric(
+    pantallas["minutos_pantallas"],
     errors="coerce"
 )
 
-pantallas["tiempo_videojuegos"] = pd.to_numeric(
-    pantallas["tiempo_videojuegos"],
+pantallas["minutos_videojuegos"] = pd.to_numeric(
+    pantallas["minutos_videojuegos"],
     errors="coerce"
 )
 
-pantallas.loc[pantallas["tiempo_pantallas"] == 999, "tiempo_pantallas"] = np.nan
-pantallas.loc[pantallas["tiempo_videojuegos"] == 999, "tiempo_videojuegos"] = np.nan
+pantallas.loc[pantallas["minutos_pantallas"] == 999, "minutos_pantallas"] = np.nan
+pantallas.loc[pantallas["minutos_videojuegos"] == 999, "minutos_videojuegos"] = np.nan
 
 pantallas["horas_pantalla_dia"] = (
-    pantallas["tiempo_pantallas"] / 60 / 7).round(2)
+    pantallas["minutos_pantallas"] / 60 / 7).round(2)
 
 pantallas["horas_videojuegos_dia"] = (
-    pantallas["tiempo_videojuegos"] / 60 / 7).round(2)
+    pantallas["minutos_videojuegos"] / 60 / 7).round(2)
 
 
 pantallas['horas_totales_pantalla_dia'] = (
@@ -233,7 +233,7 @@ frecuencia_consumo.to_csv(
 )
 
 pantallas.to_csv(
-    ruta + "pantallas.csv",
+    ruta + "tiempo_pantallas.csv",
     index=False,
     encoding="utf-8"
 )
