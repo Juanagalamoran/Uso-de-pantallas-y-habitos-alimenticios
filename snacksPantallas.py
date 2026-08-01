@@ -43,6 +43,51 @@ df_encuesta["Edadd"] = np.floor(df_encuesta["Edadd"] / 365).astype("Int64")
 #    index=False,
 #    encoding="utf-8"
 #)
+#%% Filtramos encuestados según completitud
+
+# Umbral mínimo de respuestas completas
+umbral = 0.79
+
+# Cantidad de encuestados antes del filtro
+n_inicial = len(df_encuesta)
+
+# Copia para calcular la completitud
+df_completitud = df_encuesta.copy()
+
+# Reemplazamos valores que representan falta de respuesta
+df_completitud = df_completitud.replace(["", " ", "NS/NC"], np.nan)
+
+# Columnas correspondientes a la pregunta C3_EE_7_5
+columnas_ee_75 = [f"C3_EE_7_5_O{i}" for i in range(1, 13)]
+
+# La pregunta cuenta como respondida si se completó al menos una opción
+df_completitud["C3_EE_7_5"] = (
+    df_completitud[columnas_ee_75]
+    .notna()
+    .any(axis=1)
+)
+
+# Eliminamos las 12 columnas originales para que la pregunta pese una sola vez
+df_completitud = df_completitud.drop(columns=columnas_ee_75)
+
+# Calculamos la completitud por encuestado
+completitud_filas = df_completitud.notna().mean(axis=1)
+
+# Conservamos solo quienes respondieron al menos el 50% de las preguntas
+df_encuesta = df_encuesta[completitud_filas >= umbral].copy()
+
+print(f"Encuestados iniciales: {n_inicial}")
+print(f"Encuestados luego del filtro: {len(df_encuesta)}")
+print(f"Eliminados: {n_inicial - len(df_encuesta)}")
+#%%
+print(completitud_filas.describe())
+
+print("\nPercentiles:")
+print(completitud_filas.quantile([0.50, 0.60, 0.70, 0.80, 0.90, 0.95]))
+
+print("\nCantidad de encuestados por umbral:")
+for u in [0.50, 0.60, 0.70, 0.75, 0.80, 0.85, 0.90]:
+    print(f"{u:.0%}: {(completitud_filas >= u).sum()} encuestados")
 #%%
 #Oferta alimentaria en la escuela
 
@@ -133,8 +178,17 @@ habitos_alimentarios = pd.DataFrame({
     'come viendo pantallas': df_encuesta['HAC_5_13']
 })
 #%% frecuencia de alimentos
-mapeo_frecuencia = {'Nunca o menos de 1 vez al mes': 0,'Entre 1 y 3 veces al mes': 1,'1 vez por semana': 2,
-'2 a 4 veces por semana': 3,'5 a 6 veces por semana': 4,'1 vez al d?¡a': 5,'Entre 2 y 3 veces al d?¡a': 6,'Entre 4 y 5 veces al d?¡a':7,'6 veces o m?ís por d?¡a':8}
+mapeo_frecuencia = {
+    'Nunca o menos de 1 vez al mes': 'Nunca o menos de 1 vez al mes',
+    'Entre 1 y 3 veces al mes': 'Entre 1 y 3 veces al mes',
+    '1 vez por semana': '1 vez por semana',
+    '2 a 4 veces por semana': '2 a 4 veces por semana',
+    '5 a 6 veces por semana': '5 a 6 veces por semana',
+    '1 vez al d?¡a': '1 vez al dia',
+    'Entre 2 y 3 veces al d?¡a': 'Entre 2 y 3 veces al dia',
+    'Entre 4 y 5 veces al d?¡a': 'Entre 4 y 5 veces al dia',
+    '6 veces o m?¡s por d?¡a': '6 veces o mas por dia'
+}
 
 columnas_frecuencia = ['T_C3_FCA_6_1_11','T_C3_FCA_6_1_12','T_C3_FCA_6_1_13','T_C3_FCA_6_1_14','T_C3_FCA_6_1_16']
 
@@ -158,8 +212,16 @@ for col in [
     "FC_bebidas_con_azucar"
 ]:
     frecuencia_consumo[col + "_semanalmente"] = (
-        frecuencia_consumo[col] >= 2
-    ).astype(int)
+    frecuencia_consumo[col].isin([
+        '1 vez por semana',
+        '2 a 4 veces por semana',
+        '5 a 6 veces por semana',
+        '1 vez al dia',
+        'Entre 2 y 3 veces al dia',
+        'Entre 4 y 5 veces al dia',
+        '6 veces o mas por dia'
+    ])
+).astype(int)
 
 frecuencia_consumo["consume_NR"] = (
     frecuencia_consumo[
@@ -173,46 +235,41 @@ frecuencia_consumo["consume_NR"] = (
     ].max(axis=1)
 )
 #%%Pantallas
-pantallas = df_encuesta[['id','Edadd', 'C3_AF_4_2', 'C3_AF_4_3']].copy()
+pantallas = df_encuesta[['id', 'Edadd', 'C3_AF_4_2', 'C3_AF_4_3']].copy()
 
 pantallas = pantallas.rename(columns={
-    'Edadd' : 'edad',
-    'C3_AF_4_2': 'minutos_pantallas',
-    'C3_AF_4_3': 'minutos_videojuegos'
+    'Edadd': 'edad',
+    'C3_AF_4_2': 'horas_pantallas_sem',
+    'C3_AF_4_3': 'horas_videojuegos_sem'
 })
 
-pantallas["minutos_pantallas"] = pd.to_numeric(
-    pantallas["minutos_pantallas"],
+pantallas["horas_pantallas_sem"] = pd.to_numeric(
+    pantallas["horas_pantallas_sem"],
     errors="coerce"
 )
 
-pantallas["minutos_videojuegos"] = pd.to_numeric(
-    pantallas["minutos_videojuegos"],
+pantallas["horas_videojuegos_sem"] = pd.to_numeric(
+    pantallas["horas_videojuegos_sem"],
     errors="coerce"
 )
 
-pantallas.loc[pantallas["minutos_pantallas"] == 999, "minutos_pantallas"] = np.nan
-pantallas.loc[pantallas["minutos_videojuegos"] == 999, "minutos_videojuegos"] = np.nan
+pantallas.loc[pantallas["horas_pantallas_sem"] == 999, "horas_pantallas_sem"] = np.nan
+pantallas.loc[pantallas["horas_videojuegos_sem"] == 999, "horas_videojuegos_sem"] = np.nan
 
-pantallas["horas_pantalla_dia"] = (
-    pantallas["minutos_pantallas"] / 60 / 7).round(2)
+# Convertir de minutos/semana a horas/semana
+pantallas["horas_pantallas_sem"] = (
+    pantallas["horas_pantallas_sem"] / 60
+).round(2)
 
-pantallas["horas_videojuegos_dia"] = (
-    pantallas["minutos_videojuegos"] / 60 / 7).round(2)
+pantallas["horas_videojuegos_sem"] = (
+    pantallas["horas_videojuegos_sem"] / 60
+).round(2)
 
+pantallas["horas_totales_pantalla_sem"] = (
+    pantallas["horas_pantallas_sem"] +
+    pantallas["horas_videojuegos_sem"]
+).round(2)
 
-pantallas['horas_totales_pantalla_dia'] = (
-    pantallas['horas_pantalla_dia'] +
-    pantallas['horas_videojuegos_dia']
-)
-
-#%%
-import matplotlib.pyplot as plt
-
-plt.hist(pantallas["horas_totales_pantalla_dia"], bins=30)
-plt.xlabel("Horas por día")
-plt.ylabel("Frecuencia")
-plt.show()
 #%%guardamos los csv
 consumo_escolar.to_csv(
     ruta + "consumo_escolar.csv",
@@ -238,6 +295,7 @@ pantallas.to_csv(
     encoding="utf-8"
 )
 
+df_encuesta.to_csv(ruta + "encuesta_filtrado.csv", index=False, encoding="utf-8")
 #%% Por ultimo, eliminamos las columnas que ya usamos
 """"
 columnas_a_eliminar = ['C3_EE_7_1','C3_EE_7_5_O1','C3_EE_7_5_O2','C3_EE_7_5_O3','C3_EE_7_5_O4','C3_EE_7_5_O5',
