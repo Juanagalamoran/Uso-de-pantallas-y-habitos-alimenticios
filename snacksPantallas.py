@@ -46,7 +46,7 @@ df_encuesta["Edadd"] = np.floor(df_encuesta["Edadd"] / 365).astype("Int64")
 #%% Filtramos encuestados según completitud
 
 # Umbral mínimo de respuestas completas
-umbral = 0.79
+umbral = 0.80
 
 # Cantidad de encuestados antes del filtro
 n_inicial = len(df_encuesta)
@@ -57,7 +57,7 @@ df_completitud = df_encuesta.copy()
 # Reemplazamos valores que representan falta de respuesta
 df_completitud = df_completitud.replace(["", " ", "NS/NC"], np.nan)
 
-# Columnas correspondientes a la pregunta C3_EE_7_5
+# Columnas correspondientes a la pregunta C3_EE_7_5 (checkbox: qué se ofrece en el kiosco)
 columnas_ee_75 = [f"C3_EE_7_5_O{i}" for i in range(1, 13)]
 
 # La pregunta cuenta como respondida si se completó al menos una opción
@@ -70,24 +70,29 @@ df_completitud["C3_EE_7_5"] = (
 # Eliminamos las 12 columnas originales para que la pregunta pese una sola vez
 df_completitud = df_completitud.drop(columns=columnas_ee_75)
 
-# Calculamos la completitud por encuestado
-completitud_filas = df_completitud.notna().mean(axis=1)
+# Variables que NO deben penalizar la completitud:
+# - Checkboxes de opción múltiple: un campo vacío significa "no marcado", no "sin responder"
+# - Variables con patrón de salto: solo se preguntan si se respondió Sí a un filtro previo;
+#   un campo vacío significa "no aplica", no "sin responder"
+vars_checkbox = [f"C3_HAC_5_1_6_O{i}" for i in range(1, 10)]
 
-# Conservamos solo quienes respondieron al menos el 50% de las preguntas
+vars_skip_pattern = [
+    'T_C3_EE_7_2_1', 'T_C3_EE_7_2_4', 'T_C3_EE_7_2_5', 'T_C3_EE_7_2_6', 'T_C3_EE_7_2_10',
+    'C3_EE_7_3', 'C3_EE_7_4', 'HAC_5_11'
+]
+
+vars_excluidas_completitud = vars_checkbox + vars_skip_pattern
+
+# Calculamos la completitud por encuestado, excluyendo checkbox/skip pattern del cálculo
+df_completitud_calculo = df_completitud.drop(columns=vars_excluidas_completitud, errors='ignore')
+completitud_filas = df_completitud_calculo.notna().mean(axis=1)
+
+# Conservamos solo quienes respondieron al menos el umbral de preguntas (ya corregido)
 df_encuesta = df_encuesta[completitud_filas >= umbral].copy()
 
 print(f"Encuestados iniciales: {n_inicial}")
 print(f"Encuestados luego del filtro: {len(df_encuesta)}")
 print(f"Eliminados: {n_inicial - len(df_encuesta)}")
-#%%
-print(completitud_filas.describe())
-
-print("\nPercentiles:")
-print(completitud_filas.quantile([0.50, 0.60, 0.70, 0.80, 0.90, 0.95]))
-
-print("\nCantidad de encuestados por umbral:")
-for u in [0.50, 0.60, 0.70, 0.75, 0.80, 0.85, 0.90]:
-    print(f"{u:.0%}: {(completitud_filas >= u).sum()} encuestados")
 #%%
 #Oferta alimentaria en la escuela
 
