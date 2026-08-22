@@ -208,37 +208,149 @@ frecuencia_consumo = frecuencia_consumo.rename(columns={
     'T_C3_FCA_6_1_14': 'preelaborados',
     'T_C3_FCA_6_1_16': 'FC_bebidas_con_azucar'
 })
+#%% Frecuencia de consumo: dataframe base (categorías completas, sin colapsar)
 
-for col in [
-    "copetin",
-    "golosinas",
-    "facturas",
-    "preelaborados",
-    "FC_bebidas_con_azucar"
-]:
-    frecuencia_consumo[col + "_semanalmente"] = (
-    frecuencia_consumo[col].isin([
-        '1 vez por semana',
-        '2 a 4 veces por semana',
-        '5 a 6 veces por semana',
-        '1 vez al dia',
-        'Entre 2 y 3 veces al dia',
-        'Entre 4 y 5 veces al dia',
-        '6 veces o mas por dia'
-    ])
-).astype(int)
+mapeo_frecuencia = {
+    'Nunca o menos de 1 vez al mes': 'Nunca o menos de 1 vez al mes',
+    'Entre 1 y 3 veces al mes': 'Entre 1 y 3 veces al mes',
+    '1 vez por semana': '1 vez por semana',
+    '2 a 4 veces por semana': '2 a 4 veces por semana',
+    '5 a 6 veces por semana': '5 a 6 veces por semana',
+    '1 vez al d?¡a': '1 vez al dia',
+    'Entre 2 y 3 veces al d?¡a': 'Entre 2 y 3 veces al dia',
+    'Entre 4 y 5 veces al d?¡a': 'Entre 4 y 5 veces al dia',
+    '6 veces o m?¡s por d?¡a': '6 veces o mas por dia'
+}
 
-frecuencia_consumo["consume_NR"] = (
-    frecuencia_consumo[
-        [
-            "copetin_semanalmente",
-            "golosinas_semanalmente",
-            "facturas_semanalmente",
-            "preelaborados_semanalmente",
-            "FC_bebidas_con_azucar_semanalmente"
-        ]
-    ].max(axis=1)
+columnas_frecuencia = ['T_C3_FCA_6_1_11', 'T_C3_FCA_6_1_12', 'T_C3_FCA_6_1_13', 'T_C3_FCA_6_1_14', 'T_C3_FCA_6_1_16']
+
+frecuencia_consumo = df_encuesta[['id'] + columnas_frecuencia].copy()
+frecuencia_consumo[columnas_frecuencia] = frecuencia_consumo[columnas_frecuencia].replace(mapeo_frecuencia)
+
+frecuencia_consumo = frecuencia_consumo.rename(columns={
+    'T_C3_FCA_6_1_11': 'copetin',
+    'T_C3_FCA_6_1_12': 'golosinas',
+    'T_C3_FCA_6_1_13': 'facturas',
+    'T_C3_FCA_6_1_14': 'preelaborados',
+    'T_C3_FCA_6_1_16': 'FC_bebidas_con_azucar'
+})
+
+columnas_alimentos = ['copetin', 'golosinas', 'facturas', 'preelaborados', 'FC_bebidas_con_azucar']
+
+#%% Definimos los tres umbrales de "alta frecuencia" a comparar
+
+# El orden de las categorías, de menor a mayor frecuencia, nos sirve para armar cada umbral
+orden_frecuencias = [
+    'Nunca o menos de 1 vez al mes',
+    'Entre 1 y 3 veces al mes',
+    '1 vez por semana',
+    '2 a 4 veces por semana',
+    '5 a 6 veces por semana',
+    '1 vez al dia',
+    'Entre 2 y 3 veces al dia',
+    'Entre 4 y 5 veces al dia',
+    '6 veces o mas por dia'
+]
+
+# Cada umbral define desde qué categoría (inclusive) se considera "alta frecuencia"
+umbrales = {
+    'umbral1': '2 a 4 veces por semana',
+    'umbral2': '5 a 6 veces por semana',
+    'umbral3': '1 vez al dia'
+}
+
+def construir_df_umbral(nombre_umbral, categoria_de_corte):
+    """
+    Construye un dataframe de frecuencia de consumo marcando como
+    'alta frecuencia' (1) a quienes consumen desde categoria_de_corte
+    en adelante, según el orden de orden_frecuencias.
+    """
+    indice_corte = orden_frecuencias.index(categoria_de_corte)
+    categorias_alta_frecuencia = orden_frecuencias[indice_corte:]
+
+    df_umbral = frecuencia_consumo.copy()
+
+    for col in columnas_alimentos:
+        df_umbral[col + '_altafrecuencia'] = df_umbral[col].isin(categorias_alta_frecuencia).astype(int)
+
+    columnas_altafrecuencia = [c + '_altafrecuencia' for c in columnas_alimentos]
+    df_umbral['consume_NR'] = df_umbral[columnas_altafrecuencia].max(axis=1)
+    df_umbral['cant_NR'] = df_umbral[columnas_altafrecuencia].sum(axis=1, skipna=False)
+
+    # Documentamos el umbral usado como atributo del propio dataframe,
+    # para que quede explícito de dónde salió sin tener que ir a buscar el código
+    df_umbral.attrs['umbral_alta_frecuencia'] = categoria_de_corte
+    df_umbral.attrs['categorias_incluidas'] = categorias_alta_frecuencia
+
+    return df_umbral
+
+frecuencia_consumo_umbral1 = construir_df_umbral('umbral1', umbrales['umbral1'])
+frecuencia_consumo_umbral2 = construir_df_umbral('umbral2', umbrales['umbral2'])
+frecuencia_consumo_umbral3 = construir_df_umbral('umbral3', umbrales['umbral3'])
+#%%
+import matplotlib.pyplot as plt
+import numpy as np
+
+# Resultados obtenidos (ya calculados en el chequeo anterior)
+etiquetas_umbral = [
+    'Umbral 1\n(2 a 4 veces\npor semana o más)',
+    'Umbral 2\n(5 a 6 veces\npor semana o más)',
+    'Umbral 3\n(1 vez al día\no más)'
+]
+
+porcentaje_alta_frecuencia = [91.0, 69.0, 56.6]
+porcentaje_baja_frecuencia = [9.0, 31.0, 43.4]
+
+x = np.arange(len(etiquetas_umbral))
+ancho = 0.5
+
+fig, ax = plt.subplots(figsize=(9, 6))
+
+barras_alta = ax.bar(
+    x, porcentaje_alta_frecuencia, ancho,
+    label='Alta frecuencia', color='#C44E52', edgecolor='white', linewidth=1.2
 )
+barras_baja = ax.bar(
+    x, porcentaje_baja_frecuencia, ancho, bottom=porcentaje_alta_frecuencia,
+    label='Baja frecuencia', color='#B0B0B0', edgecolor='white', linewidth=1.2
+)
+
+# Etiquetas dentro de cada segmento
+for i in range(len(x)):
+    ax.text(x[i], porcentaje_alta_frecuencia[i] / 2,
+            f'{porcentaje_alta_frecuencia[i]:.1f}%'.replace('.', ','),
+            ha='center', va='center', fontsize=11, fontweight='bold', color='white')
+    ax.text(x[i], porcentaje_alta_frecuencia[i] + porcentaje_baja_frecuencia[i] / 2,
+            f'{porcentaje_baja_frecuencia[i]:.1f}%'.replace('.', ','),
+            ha='center', va='center', fontsize=11, fontweight='bold', color='white')
+
+ax.set_title('Comparación de umbrales para definir "alta frecuencia"\nde consumo de alimentos no recomendados',
+              fontsize=13, fontweight='bold', pad=15)
+ax.set_ylabel('Porcentaje de adolescentes (%)', fontsize=11)
+ax.set_xticks(x)
+ax.set_xticklabels(etiquetas_umbral, fontsize=10)
+ax.set_ylim(0, 100)
+
+ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=2, frameon=False, fontsize=10)
+
+ax.spines['top'].set_visible(False)
+ax.spines['right'].set_visible(False)
+ax.spines['left'].set_visible(False)
+ax.set_yticks([])
+
+plt.tight_layout()
+plt.savefig('comparacion_umbrales_alta_frecuencia.png', dpi=300, bbox_inches='tight')
+plt.show()
+#%% Chequeo rápido: cuánta gente cae en "alta frecuencia" (consume_NR) según cada umbral
+
+for nombre, df in [
+    ('umbral1 (2 a 4 veces/sem o más)', frecuencia_consumo_umbral1),
+    ('umbral2 (5 a 6 veces/sem o más)', frecuencia_consumo_umbral2),
+    ('umbral3 (1 vez al día o más)', frecuencia_consumo_umbral3),
+]:
+    print(f"{nombre}: umbral usado = '{df.attrs['umbral_alta_frecuencia']}'")
+    print(df['consume_NR'].value_counts(normalize=True).multiply(100).round(1))
+    print()
 #%%Pantallas
 pantallas = df_encuesta[['id', 'Edadd', 'C3_AF_4_2', 'C3_AF_4_3']].copy()
 
@@ -281,26 +393,38 @@ consumo_escolar.to_csv(
     index=False,
     encoding="utf-8"
 )
-
 habitos_alimentarios.to_csv(
     ruta + "habitos_alimentarios.csv",
     index=False,
     encoding="utf-8"
 )
-
 frecuencia_consumo.to_csv(
     ruta + "frecuencia_consumo.csv",
     index=False,
     encoding="utf-8"
 )
-
 pantallas.to_csv(
     ruta + "tiempo_pantallas.csv",
     index=False,
     encoding="utf-8"
 )
-
 df_encuesta.to_csv(ruta + "encuesta_filtrado.csv", index=False, encoding="utf-8")
+
+frecuencia_consumo_umbral1.to_csv(
+    ruta + "frecuencia_consumo_umbral1_2a4vecesSem.csv",
+    index=False,
+    encoding="utf-8"
+)
+frecuencia_consumo_umbral2.to_csv(
+    ruta + "frecuencia_consumo_umbral2_5a6vecesSem.csv",
+    index=False,
+    encoding="utf-8"
+)
+frecuencia_consumo_umbral3.to_csv(
+    ruta + "frecuencia_consumo_umbral3_1vezDia.csv",
+    index=False,
+    encoding="utf-8"
+)
 #%% Por ultimo, eliminamos las columnas que ya usamos
 """"
 columnas_a_eliminar = ['C3_EE_7_1','C3_EE_7_5_O1','C3_EE_7_5_O2','C3_EE_7_5_O3','C3_EE_7_5_O4','C3_EE_7_5_O5',
