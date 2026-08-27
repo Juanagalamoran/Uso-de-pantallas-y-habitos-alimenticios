@@ -7,15 +7,21 @@ Created on Thu May 28 13:56:25 2026
 
 import pandas as pd
 import numpy as np
+import csv 
+ruta = 'C:/Users/cuina/OneDrive/Escritorio/proyectoSole/'
+#ruta = 'C:/Users/Juani/OneDrive/Escritorio/proyectoSole/Uso-de-pantallas-y-habitos-alimenticios/' 
 
-ruta = 'C:/Users/Juani/OneDrive/Escritorio/proyectoSole/Uso-de-pantallas-y-habitos-alimenticios/' 
-#ruta = 'C:/Users/cuina/OneDrive/Escritorio/proyectoSole/'
-
-# Raw data
 df_variables = pd.read_csv(ruta + 'ennys2_variables.csv', encoding='latin1', sep=';')
-df_encuesta = pd.read_csv(ruta + 'ENNyS2_encuesta.csv', encoding='latin1', sep=';')
 
-#%% Filtramos x grupo etario 
+path = r'C:/Users/cuina/OneDrive/Escritorio/proyectoSole/ENNyS2_encuesta.csv'
+
+df_encuesta = pd.read_csv(
+    path,
+    low_memory=False,   # Elimina el DtypeWarning y procesa correctamente tipos mixtos
+    on_bad_lines='skip' # Controla de forma limpia las líneas mal formadas
+)
+#%%
+# Filtramos x grupo etario 
 patron_variables = r'^(?:C3_HAC_5_1|C3_HAC_5_12|T_C3_FCA_6_1_1|C3_EE_7_|T_C3_EE_7_2_|C3_AAPC_8_|C3_AF_4_2|C3_AF_4_3)'
 df_variables = df_variables[df_variables['id'].str.contains(patron_variables, na=False, regex=True)]
 df_encuesta = df_encuesta[df_encuesta['E_CUEST'].str.contains('13 a 17', na=False)]
@@ -38,11 +44,6 @@ df_encuesta["Edadd"] = pd.to_numeric(
 
 df_encuesta["Edadd"] = np.floor(df_encuesta["Edadd"] / 365).astype("Int64")
 
-#df_encuesta.to_csv(
-#    r"C:\Users\juani\OneDrive\Escritorio\encuesta_filtrada.csv",
-#    index=False,
-#    encoding="utf-8"
-#)
 #%% Filtramos encuestados según completitud
 
 # Umbral mínimo de respuestas completas
@@ -197,17 +198,38 @@ mapeo_frecuencia = {
 
 columnas_frecuencia = ['T_C3_FCA_6_1_11','T_C3_FCA_6_1_12','T_C3_FCA_6_1_13','T_C3_FCA_6_1_14','T_C3_FCA_6_1_16']
 
-frecuencia_consumo = df_encuesta[['id'] + columnas_frecuencia].copy()
+# --- Creación correcta de frecuencia_consumo ---
+frecuencia_consumo = pd.DataFrame()
 
-frecuencia_consumo[columnas_frecuencia] = (frecuencia_consumo[columnas_frecuencia].replace(mapeo_frecuencia))
+frecuencia_consumo['id'] = df_encuesta['id']
 
-frecuencia_consumo = frecuencia_consumo.rename(columns={
-    'T_C3_FCA_6_1_11': 'copetin',
-    'T_C3_FCA_6_1_12': 'golosinas',
-    'T_C3_FCA_6_1_13': 'facturas',
-    'T_C3_FCA_6_1_14': 'preelaborados',
-    'T_C3_FCA_6_1_16': 'FC_bebidas_con_azucar'
-})
+# Mapeamos 'Si' / '1' / frecuencias mayores a 0 como 1 (consumidor), y el resto como 0
+def a_binario(val):
+    if pd.isna(val):
+        return 0
+    val_str = str(val).strip().lower()
+    return 1 if val_str in ['si', 'sí', '1', '1.0', 'true'] or (val_str.isdigit() and int(val_str) > 0 and val_str != '0') else 0
+
+# Asignación de variables según correspondencia ENNyS2
+frecuencia_consumo['copetin'] = df_encuesta['C3_HAC_5_1_6_O1'].apply(a_binario)
+frecuencia_consumo['FC_bebidas_con_azucar'] = df_encuesta['C3_HAC_5_1_6_O2'].apply(a_binario)
+frecuencia_consumo['golosinas'] = df_encuesta['HAC_5_10'].apply(a_binario)
+frecuencia_consumo['facturas'] = df_encuesta['HAC_5_11'].apply(a_binario)
+frecuencia_consumo['preelaborados'] = df_encuesta['HAC_5_12'].apply(a_binario)
+
+# Guardamos el CSV ya limpio y numérico (para que a tu amiga le lea exacto con ;)
+frecuencia_consumo.to_csv(ruta + 'frecuencia_consumo.csv', index=False, sep=';')
+#frecuencia_consumo = df_encuesta[['id'] + columnas_frecuencia].copy()
+
+#frecuencia_consumo[columnas_frecuencia] = (frecuencia_consumo[columnas_frecuencia].replace(mapeo_frecuencia))
+
+#frecuencia_consumo = frecuencia_consumo.rename(columns={
+#    'T_C3_FCA_6_1_11': 'copetin',
+#    'T_C3_FCA_6_1_12': 'golosinas',
+#    'T_C3_FCA_6_1_13': 'facturas',
+#    'T_C3_FCA_6_1_14': 'preelaborados',
+#    'T_C3_FCA_6_1_16': 'FC_bebidas_con_azucar'
+#})
 #%% Frecuencia de consumo: dataframe base (categorías completas, sin colapsar)
 
 mapeo_frecuencia = {

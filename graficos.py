@@ -9,7 +9,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 
-ruta = 'C:/Users/Juani/OneDrive/Escritorio/proyectoSole/Uso-de-pantallas-y-habitos-alimenticios/' 
+ruta = 'C:/Users/cuina/OneDrive/Escritorio/proyectoSole/'
+#ruta = 'C:/Users/Juani/OneDrive/Escritorio/proyectoSole/Uso-de-pantallas-y-habitos-alimenticios/' 
 
 
 encuesta = pd.read_csv(ruta + 'encuesta_filtrado.csv', encoding='latin1', sep=',')
@@ -107,31 +108,35 @@ axes[-1].set_xlabel('Horas semanales', fontsize=11)
 plt.tight_layout(rect=[0, 0, 1, 0.96])
 plt.savefig('distribucion_pantallas.png', dpi=300, bbox_inches='tight')
 plt.show()
-#%% Grafico 3: distribucion de frecuencia de consumo
-# Variables binarias de consumo semanal 
-variables_consumo = [
-    'copetin_semanalmente',
-    'golosinas_semanalmente',
-    'facturas_semanalmente',
-    'preelaborados_semanalmente',
-    'FC_bebidas_con_azucar_semanalmente'
-]
 
-# Nombres legibles para el eje X
-nombres_legibles = {
-    'copetin_semanalmente': 'Copetín',
-    'golosinas_semanalmente': 'Golosinas',
-    'facturas_semanalmente': 'Facturas',
-    'preelaborados_semanalmente': 'Preelaborados',
-    'FC_bebidas_con_azucar_semanalmente': 'Bebidas\nazucaradas'
+#%% Grafico 3: distribucion de frecuencia de consumo
+
+# 1. Definimos la correspondencia entre los códigos de la encuesta y las etiquetas
+columnas_ennys = {
+    'HAC_5_12': 'Preelaborados',
+    'C3_HAC_5_1_6_O1': 'Copetín',
+    'HAC_5_10': 'Golosinas',
+    'HAC_5_11': 'Facturas',
+    'C3_HAC_5_1_6_O2': 'Bebidas\nazucaradas'
 }
 
-# El promedio de una variable binaria equivale al porcentaje de 1s (mean() ignora NaN)
+# 2. Copiamos las columnas existentes
+cols_validas = [col for col in columnas_ennys.keys() if col in encuesta.columns]
+df_temp = encuesta[cols_validas].copy()
+
+# 3. Convertimos dinámicamente: todo lo que NO sea 'no', 'nunca' o '0' cuenta como consumo (1)
+for col in cols_validas:
+    # Limpiamos espacios alrededor de los textos
+    s = df_temp[col].astype(str).str.strip().str.lower()
+    # Si contiene 'si', números > 0 o palabras distintas de 'no'/'nunca', es 1
+    df_temp[col] = np.where(s.isin(['no', 'nunca', '0', '0.0', 'nan', 'none', '']), 0, 1)
+
+# 4. Calculamos porcentajes y ordenamos
 porcentajes = (
-    frecuencia_consumo[variables_consumo]
+    df_temp
     .mean()
     .multiply(100)
-    .rename(index=nombres_legibles)
+    .rename(index=columnas_ennys)
     .sort_values(ascending=False)
 )
 
@@ -146,7 +151,7 @@ barras = ax.bar(
     width=0.6
 )
 
-# Porcentaje sobre cada barra
+# Etiquetas de porcentaje sobre cada barra
 for barra, valor in zip(barras, porcentajes.values):
     ax.text(
         barra.get_x() + barra.get_width() / 2,
@@ -160,7 +165,9 @@ ax.set_title('Consumo semanal de alimentos no recomendados en adolescentes',
               fontsize=13, fontweight='bold', pad=15)
 ax.set_xlabel('Grupo de alimentos', fontsize=11)
 ax.set_ylabel('Porcentaje de adolescentes (%)', fontsize=11)
-ax.set_ylim(0, max(porcentajes.values) * 1.15)
+
+max_val = np.nanmax(porcentajes.values) if len(porcentajes.dropna()) > 0 else 100
+ax.set_ylim(0, min(100, max_val * 1.25))
 
 ax.spines['top'].set_visible(False)
 ax.spines['right'].set_visible(False)
