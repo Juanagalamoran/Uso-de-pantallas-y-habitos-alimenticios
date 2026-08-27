@@ -8,6 +8,9 @@ Created on Sat Aug  1 17:52:38 2026
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
+import seaborn as sns
+
+sns.set_theme(style='whitegrid', context='notebook')  # antes 'talk' -> ahora 'notebook' (letras más chicas)
 
 ruta = 'C:/Users/cuina/OneDrive/Escritorio/proyectoSole/'
 #ruta = 'C:/Users/Juani/OneDrive/Escritorio/proyectoSole/Uso-de-pantallas-y-habitos-alimenticios/' 
@@ -63,52 +66,47 @@ plt.savefig('distribucion_edad.png', dpi=300, bbox_inches='tight')
 plt.show()
 #%% grafico 2: Distribucion de horas de pantalla
 variables_pantallas = ['horas_pantallas_sem', 'horas_videojuegos_sem', 'horas_totales_pantalla_sem']
-titulos = [
-    'Pantallas',
-    'Videojuegos',
-    'Total de pantallas'
-]
-
+titulos = ['Pantallas', 'Videojuegos', 'Total de pantallas']
 datos = [tiempo_pantallas[var].dropna() for var in variables_pantallas]
 
-# --- Bins comunes para las tres variables ---
-# Se calcula el rango global combinando las tres variables,
-# de modo que los tres histogramas usen exactamente los mismos intervalos.
-valor_min = 0  # las horas no pueden ser negativas
+valor_min = 0
 valor_max = max(d.max() for d in datos)
+print('valor_max:', valor_max)  # chequeo rápido de rango
 
-ancho_bin = 5  # horas por intervalo; ajustar según distribución real de los datos
+ancho_bin = 5
 bins = np.arange(valor_min, valor_max + ancho_bin, ancho_bin)
 
-# --- Construcción del gráfico ---
-fig, axes = plt.subplots(
-    nrows=3, ncols=1,
-    figsize=(8, 10),
-    sharex=True,   # mismo eje X
-    sharey=True    # mismo eje Y
-)
+umbral_horas = 14
 
+fig, axes = plt.subplots(nrows=3, ncols=1, figsize=(8, 10), sharex=True, sharey=True)
 fig.suptitle('Distribución del tiempo semanal de uso de pantallas en adolescentes',
              fontsize=14, fontweight='bold', y=0.98)
 
 colores = ['#4C72B0', '#DD8452', '#55A868']
 
-for ax, dato, titulo, color in zip(axes, datos, titulos, colores):
-    ax.hist(dato, bins=bins, color=color, edgecolor='white', linewidth=1.0)
+for i, (ax, dato, titulo, color) in enumerate(zip(axes, datos, titulos, colores)):
+    ax.hist(dato, bins=bins, color=color, edgecolor='white', linewidth=1.0, zorder=2)
+    ax.axvline(
+        umbral_horas,
+        color='red',
+        linestyle='--',
+        linewidth=2,
+        zorder=5,
+        label=f'tiempo maximo sugerido de consumo de pantallas ({umbral_horas} hs)' if i == 0 else None
+    )
     ax.set_title(titulo, fontsize=11, fontweight='bold', loc='left')
     ax.set_ylabel('Cantidad de\nadolescentes', fontsize=10)
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
-    ax.grid(axis='y', linestyle='--', alpha=0.4)
     ax.set_axisbelow(True)
+    ax.grid(axis='y', linestyle='--', alpha=0.4, zorder=0)
 
 axes[-1].set_xlabel('Horas semanales', fontsize=11)
-
+fig.legend(loc='upper right', bbox_to_anchor=(0.98, 0.97), fontsize=9, frameon=False)
 
 plt.tight_layout(rect=[0, 0, 1, 0.96])
 plt.savefig('distribucion_pantallas.png', dpi=300, bbox_inches='tight')
 plt.show()
-
 #%% Grafico 3: distribucion de frecuencia de consumo
 
 # 1. Definimos la correspondencia entre los códigos de la encuesta y las etiquetas
@@ -179,20 +177,18 @@ plt.tight_layout()
 plt.savefig('consumo_alimentos_no_recomendados.png', dpi=300, bbox_inches='tight')
 plt.show()
 #%% Grafico 4 Histograma de adolecentes que comen o no en la escuela.
+def clasificar_come_escuela(val):
+    val = str(val).strip()
+    if val in ['No', 'NS/NC']:
+        return val
+    elif val == '' or val.lower() == 'nan':
+        return np.nan
+    else:
+        return 'Sí'  # cualquier variante corrupta de "Sí" cae acá
 
-# Mapeamos los valores tal cual aparecen en el dataset a categorías limpias
-mapa_come_escuela = {
-    'No': 'No',
-    'S?Â¡': 'Sí',
-    'NS/NC': 'NS/NC',
-    ' ': np.nan  # blanco = missing
-}
+consumo_escolar['come_escuela'] = consumo_escolar['Come en la escuela'].apply(clasificar_come_escuela)
 
-consumo_escolar['come_escuela'] = (
-    consumo_escolar['Come en la escuela']
-    .replace(mapa_come_escuela)
-)
-
+print(consumo_escolar['come_escuela'].value_counts(dropna=False))
 consumo_escolar['come_escuela'].value_counts(dropna=False)
 
 porcentajes_come = (
@@ -366,6 +362,11 @@ plt.tight_layout()
 plt.savefig('cant_E_NR.png', dpi=300, bbox_inches='tight')
 plt.show()
 #%%
+cols_frecuencia = ['copetin', 'golosinas', 'facturas', 'preelaborados', 'FC_bebidas_con_azucar']
+
+frecuencia_consumo['cant_NR'] = (
+    frecuencia_consumo[cols_frecuencia] != 'Nunca o menos de 1 vez al mes'
+).sum(axis=1)
 datos_grafico7 = pd.merge(
     tiempo_pantallas[['id', 'horas_totales_pantalla_sem']],
     frecuencia_consumo[['id', 'cant_NR']],
@@ -533,4 +534,180 @@ ax.set_axisbelow(True)
 
 plt.tight_layout()
 plt.savefig('promedio_NR_come_viendo_pantallas.png', dpi=300, bbox_inches='tight')
+plt.show()
+
+#%% Grafico 8: cant_NR (consumo general) según tercil de horas de pantalla
+
+cols_frecuencia = ['copetin', 'golosinas', 'facturas', 'preelaborados', 'FC_bebidas_con_azucar']
+frecuencia_consumo['cant_NR'] = (
+    frecuencia_consumo[cols_frecuencia] != 'Nunca o menos de 1 vez al mes'
+).sum(axis=1)
+
+datos_g8 = pd.merge(
+    tiempo_pantallas[['id', 'tercil_pantalla']],
+    frecuencia_consumo[['id', 'cant_NR']],
+    on='id',
+    how='inner'
+).dropna(subset=['tercil_pantalla'])
+
+orden_terciles = ['Bajo consumo', 'Consumo medio', 'Alto consumo']
+datos_g8['tercil_pantalla'] = pd.Categorical(
+    datos_g8['tercil_pantalla'],
+    categories=orden_terciles,
+    ordered=True
+)
+
+resumen_g8 = datos_g8.groupby('tercil_pantalla', observed=True)['cant_NR'].agg(['mean', 'sem'])
+resumen_g8 = resumen_g8.reindex(orden_terciles)
+
+paleta_terciles = sns.color_palette('Blues', n_colors=3)  # degradé sobrio, discreto
+
+fig, ax = plt.subplots(figsize=(6.5, 4.5))
+barras = ax.bar(
+    resumen_g8.index.astype(str),
+    resumen_g8['mean'],
+    yerr=resumen_g8['sem'],
+    capsize=5,
+    color=paleta_terciles,
+    edgecolor='white',
+    linewidth=1,
+    width=0.55
+)
+
+for barra, valor in zip(barras, resumen_g8['mean']):
+    ax.text(
+        barra.get_x() + barra.get_width() / 2,
+        valor + 0.05,
+        f'{valor:.2f}'.replace('.', ','),
+        ha='center', va='bottom', fontsize=9, fontweight='bold'
+    )
+
+ax.set_title('Consumo de alimentos no recomendados según nivel de uso de pantallas',
+              fontsize=11, fontweight='bold', pad=12)
+ax.set_xlabel('Tercil de horas de pantalla (diarias)', fontsize=9)
+ax.set_ylabel('Promedio de grupos de alimentos\nno recomendados consumidos (0-5)', fontsize=9)
+ax.tick_params(axis='both', labelsize=8.5)
+sns.despine(ax=ax)
+
+n_total = len(datos_g8)
+ax.text(1.0, 1.05, f'n = {n_total}', transform=ax.transAxes,
+        ha='right', va='bottom', fontsize=7.5, style='italic', color='gray')
+
+plt.tight_layout()
+plt.savefig('cant_NR_por_tercil.png', dpi=300, bbox_inches='tight')
+plt.show()
+
+print(datos_g8.groupby('tercil_pantalla', observed=True)['cant_NR'].describe())
+
+#%% Grafico 9: cant_colaciones_NR según tercil de horas de pantalla
+
+datos_g9 = pd.merge(
+    tiempo_pantallas[['id', 'tercil_pantalla']],
+    habitos_alimentarios[['id', 'cant_colaciones_NR']],
+    on='id',
+    how='inner'
+).dropna(subset=['tercil_pantalla'])
+
+orden_terciles = ['Bajo consumo', 'Consumo medio', 'Alto consumo']
+datos_g9['tercil_pantalla'] = pd.Categorical(
+    datos_g9['tercil_pantalla'],
+    categories=orden_terciles,
+    ordered=True
+)
+
+resumen_g9 = datos_g9.groupby('tercil_pantalla', observed=True)['cant_colaciones_NR'].agg(['mean', 'sem'])
+resumen_g9 = resumen_g9.reindex(orden_terciles)
+
+paleta_terciles = sns.color_palette('Blues', n_colors=3)
+
+fig, ax = plt.subplots(figsize=(6.5, 4.5))
+barras = ax.bar(
+    resumen_g9.index.astype(str),
+    resumen_g9['mean'],
+    yerr=resumen_g9['sem'],
+    capsize=5,
+    color=paleta_terciles,
+    edgecolor='white',
+    linewidth=1,
+    width=0.55
+)
+
+for barra, valor in zip(barras, resumen_g9['mean']):
+    ax.text(
+        barra.get_x() + barra.get_width() / 2,
+        valor + 0.05,
+        f'{valor:.2f}'.replace('.', ','),
+        ha='center', va='bottom', fontsize=9, fontweight='bold'
+    )
+
+ax.set_title('Consumo de colaciones no recomendadas según nivel de uso de pantallas',
+              fontsize=11, fontweight='bold', pad=12)
+ax.set_xlabel('Tercil de horas de pantalla (diarias)', fontsize=9)
+ax.set_ylabel('Promedio de colaciones\nno recomendadas', fontsize=9)
+ax.tick_params(axis='both', labelsize=8.5)
+sns.despine(ax=ax)
+
+n_total = len(datos_g9)
+ax.text(1.0, 1.05, f'n = {n_total}', transform=ax.transAxes,
+        ha='right', va='bottom', fontsize=7.5, style='italic', color='gray')
+
+plt.tight_layout()
+plt.savefig('cant_colaciones_NR_por_tercil.png', dpi=300, bbox_inches='tight')
+plt.show()
+
+#%% Grafico 10: cant_E_NR (compras en el kiosco escolar) según tercil de horas de pantalla
+# Solo entre quienes efectivamente comen en la escuela
+
+datos_g10 = pd.merge(
+    tiempo_pantallas[['id', 'tercil_pantalla']],
+    consumo_escolar[consumo_escolar['come_escuela'] == 'Sí'][['id', 'cant_E_NR']],
+    on='id',
+    how='inner'
+).dropna(subset=['tercil_pantalla'])
+
+orden_terciles = ['Bajo consumo', 'Consumo medio', 'Alto consumo']
+datos_g10['tercil_pantalla'] = pd.Categorical(
+    datos_g10['tercil_pantalla'],
+    categories=orden_terciles,
+    ordered=True
+)
+
+resumen_g10 = datos_g10.groupby('tercil_pantalla', observed=True)['cant_E_NR'].agg(['mean', 'sem'])
+resumen_g10 = resumen_g10.reindex(orden_terciles)
+
+paleta_terciles = sns.color_palette('Blues', n_colors=3)
+
+fig, ax = plt.subplots(figsize=(6.5, 4.5))
+barras = ax.bar(
+    resumen_g10.index.astype(str),
+    resumen_g10['mean'],
+    yerr=resumen_g10['sem'],
+    capsize=5,
+    color=paleta_terciles,
+    edgecolor='white',
+    linewidth=1,
+    width=0.55
+)
+
+for barra, valor in zip(barras, resumen_g10['mean']):
+    ax.text(
+        barra.get_x() + barra.get_width() / 2,
+        valor + 0.05,
+        f'{valor:.2f}'.replace('.', ','),
+        ha='center', va='bottom', fontsize=9, fontweight='bold'
+    )
+
+ax.set_title('Compra de alimentos no recomendados en el kiosco escolar\nsegún nivel de uso de pantallas',
+              fontsize=11, fontweight='bold', pad=12)
+ax.set_xlabel('Tercil de horas de pantalla (diarias)', fontsize=9)
+ax.set_ylabel('Promedio de tipos de alimentos\nno recomendados comprados', fontsize=9)
+ax.tick_params(axis='both', labelsize=8.5)
+sns.despine(ax=ax)
+
+n_total = len(datos_g10)
+ax.text(1.0, 1.05, f'Base: come en la escuela, n = {n_total}', transform=ax.transAxes,
+        ha='right', va='bottom', fontsize=7.5, style='italic', color='gray')
+
+plt.tight_layout()
+plt.savefig('cant_E_NR_por_tercil.png', dpi=300, bbox_inches='tight')
 plt.show()

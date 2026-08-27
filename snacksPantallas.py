@@ -7,19 +7,13 @@ Created on Thu May 28 13:56:25 2026
 
 import pandas as pd
 import numpy as np
-import csv 
+import matplotlib.pyplot as plt
+
 ruta = 'C:/Users/cuina/OneDrive/Escritorio/proyectoSole/'
 #ruta = 'C:/Users/Juani/OneDrive/Escritorio/proyectoSole/Uso-de-pantallas-y-habitos-alimenticios/' 
 
 df_variables = pd.read_csv(ruta + 'ennys2_variables.csv', encoding='latin1', sep=';')
-
-path = r'C:/Users/cuina/OneDrive/Escritorio/proyectoSole/ENNyS2_encuesta.csv'
-
-df_encuesta = pd.read_csv(
-    path,
-    low_memory=False,   # Elimina el DtypeWarning y procesa correctamente tipos mixtos
-    on_bad_lines='skip' # Controla de forma limpia las líneas mal formadas
-)
+df_encuesta = pd.read_csv(ruta + 'ENNyS2_encuesta.csv', encoding='latin1', sep=';')
 #%%
 # Filtramos x grupo etario 
 patron_variables = r'^(?:C3_HAC_5_1|C3_HAC_5_12|T_C3_FCA_6_1_1|C3_EE_7_|T_C3_EE_7_2_|C3_AAPC_8_|C3_AF_4_2|C3_AF_4_3)'
@@ -310,8 +304,7 @@ frecuencia_consumo_umbral1 = construir_df_umbral('umbral1', umbrales['umbral1'])
 frecuencia_consumo_umbral2 = construir_df_umbral('umbral2', umbrales['umbral2'])
 frecuencia_consumo_umbral3 = construir_df_umbral('umbral3', umbrales['umbral3'])
 #%%
-import matplotlib.pyplot as plt
-import numpy as np
+
 
 # Resultados obtenidos (ya calculados en el chequeo anterior)
 etiquetas_umbral = [
@@ -409,6 +402,27 @@ pantallas["horas_totales_pantalla_sem"] = (
     pantallas["horas_videojuegos_sem"]
 ).round(2)
 
+#%% Categorización por terciles de horas de pantalla
+# pd.qcut divide automáticamente la variable en 3 grupos con igual cantidad
+# de observaciones (33% cada uno), calculando los puntos de corte (XX y ZZZ)
+
+pantallas["horas_totales_pantalla_dia"] = (
+    pantallas["horas_totales_pantalla_sem"] / 7
+).round(2)
+
+pantallas["tercil_pantalla"], cortes = pd.qcut(
+    pantallas["horas_totales_pantalla_dia"],
+    q=3,
+    labels=["Bajo consumo", "Consumo medio", "Alto consumo"],
+    retbins=True
+)
+
+print("Puntos de corte de los terciles (horas diarias):")
+print(f"  Grupo 1 - Bajo consumo:   < {cortes[1]:.2f} hs/día")
+print(f"  Grupo 2 - Consumo medio: {cortes[1]:.2f} a {cortes[2]:.2f} hs/día")
+print(f"  Grupo 3 - Alto consumo:  > {cortes[2]:.2f} hs/día")
+print()
+print(pantallas["tercil_pantalla"].value_counts(dropna=False).sort_index())
 #%%guardamos los csv
 consumo_escolar.to_csv(
     ruta + "consumo_escolar.csv",
